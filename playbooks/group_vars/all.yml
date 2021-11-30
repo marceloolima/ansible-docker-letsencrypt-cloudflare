@@ -1,0 +1,12 @@
+---
+# Credential to connect to VM
+ansible_ssh_pass: 123456
+ansible_connection: ssh
+
+# Credential to access cloudflare and send email
+cloudflare_api_token: "123456789012345678901234567890123456"
+cloudflare_email: marcelo.de.lm@gmail.com.br
+
+# Credential to send email
+username_email: marcelo.de.lm@gmail.com.br
+password_email: 123456

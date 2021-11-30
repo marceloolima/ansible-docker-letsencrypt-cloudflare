@@ -1,0 +1,32 @@
+---
+- hosts: localhost:server_web_app
+  remote_user: root
+  ignore_errors: yes
+  vars:
+    tmpdir: "/certs/DOMINIO"
+    account_key: "le-account-key.pem"
+    keyname: "DOMINIO.key"
+    csrname: "DOMINIO.csr"
+    certname: "DOMINIO.crt"
+    fullchain: "DOMINIO.pem"
+    cloudflare_zone: "DOMINIO"
+    common_name: "*.DOMINIO"
+    to_email: ALERT_EMAIL
+    ssl_file_nginx: "/etc/nginx/ssl/DOMINIO"
+    ssl_file_owner: nginx
+    ssl_file_group: nginx
+    
+  tasks:
+    - name: letsencrypt cloudflare
+      include_role:
+        name: letsencrypt-cloudflare
+        apply:
+          delegate_to: 127.0.0.1
+          run_once: true
+
+    - name: copy files
+      include_role:
+        name: copy-files
+      when: 
+        - cert_retrieval.changed == true
+        - inventory_hostname in groups.server_web_app

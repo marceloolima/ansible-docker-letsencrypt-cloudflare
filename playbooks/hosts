@@ -1,0 +1,15 @@
+# Invetary
+###############################################################
+[targets]
+localhost                             ansible_connection=local
+
+[server_web_app]
+server_web_production_app01           ansible_host=10.233.33.30
+server_web_production_app01           ansible_host=10.233.33.31
+server_web_production_app01           ansible_host=10.233.33.32
+server_web_production_app01           ansible_host=10.233.33.33
+
+server_web_staging_app01              ansible_host=10.233.40.40
+server_web_staging_app01              ansible_host=10.233.40.41
+server_web_staging_app01              ansible_host=10.233.40.42
+server_web_staging_app01              ansible_host=10.233.40.43

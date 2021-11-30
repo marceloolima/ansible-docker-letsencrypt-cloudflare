@@ -1,0 +1,19 @@
+version: "3"
+services:
+  ansible:
+    image: fcard/ansible:v1
+    environment:
+      - DOMINIO=meudominio.com.br
+      - ALERT_EMAIL=marcelo.de.lm@gmail.com.br
+    build:
+      context: ./
+      dockerfile: dockerfile
+    volumes:
+      - ./playbooks:/playbooks
+      - ./certs:/certs
+    networks:
+      - fcard-network
+
+networks:
+  fcard-network:
+    driver: bridge

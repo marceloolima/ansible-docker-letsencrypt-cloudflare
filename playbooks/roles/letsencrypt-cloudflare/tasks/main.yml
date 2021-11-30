@@ -1,0 +1,103 @@
+---
+  - name: localhost - create temp dir
+    file:
+      path: "{{ tmpdir }}/"
+      state: directory
+      recurse: yes
+
+  - name: localhost - create temp account key
+    openssl_privatekey:
+      path: "{{ tmpdir }}/{{ account_key }}"
+      size: 2048
+
+  - name: localhost - create private key
+    openssl_privatekey:
+      path: "{{ tmpdir }}/{{ keyname }}"
+      size: 2048
+
+  - name: localhost - create CSR
+    openssl_csr:
+      path: "{{ tmpdir }}/{{ csrname }}"
+      privatekey_path: "{{ tmpdir }}/{{ keyname }}"
+      common_name: "{{ common_name }}"
+      country_name: br
+      organization_name: "Example letsencrypt cloudflare"
+      email_address: "{{ cloudflare_email }}"
+
+  - name: LetsEncrypt - submit request
+    acme_certificate:
+      account_key_src: "{{ tmpdir }}/{{ account_key }}"
+      account_email: "{{ cloudflare_email }}"
+      src: "{{ tmpdir }}/{{ csrname }}"
+      fullchain_dest: "{{ tmpdir }}/{{ certname }}"
+      challenge: dns-01
+      acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+      acme_version: 2
+      terms_agreed: yes
+      remaining_days: 60
+    register: challenge
+
+  - name: create cloudflare TXT records
+    cloudflare_dns:
+      account_api_token: "{{ cloudflare_api_token }}"
+      account_email: "{{ cloudflare_email }}"
+      zone: "{{ cloudflare_zone }}"
+      record: "{{ challenge['challenge_data'][item]['dns-01']['resource'] }}"
+      type: TXT
+      value: "{{ challenge['challenge_data'][item]['dns-01']['resource_value'] }}"
+      solo: true
+      state: present
+    with_items: "{{ [common_name] }}"
+    when: challenge is changed
+  
+  - name: LetsEncrypt - retrieve cert
+    acme_certificate:
+      account_key_src: "{{ tmpdir }}/{{ account_key }}"
+      account_email: "{{ cloudflare_email }}"
+      src: "{{ tmpdir }}/{{ csrname }}"
+      dest: "{{ tmpdir }}/{{ certname }}"
+      fullchain_dest: "{{ tmpdir }}/{{ fullchain }}"
+      challenge: dns-01
+      acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+      acme_version: 2
+      terms_agreed: yes
+      remaining_days: 60
+      data: "{{ challenge }}"
+    register: cert_retrieval
+  
+  - name: delete cloudflare TXT record
+    cloudflare_dns:
+      account_api_token: "{{ cloudflare_api_token }}"
+      account_email: "{{ cloudflare_email }}"
+      zone: "{{ cloudflare_zone }}"
+      record: "{{ challenge['challenge_data'][item]['dns-01']['resource'] }}"
+      type: TXT
+      state: absent
+    with_items: "{{ [common_name] }}"
+    when: challenge is changed
+
+  - name: localhost - remove the account key
+    file:
+      path: "{{ tmpdir }}/{{ account_key }}"
+      state: absent
+    when: cert_retrieval is changed
+
+  - name: send succeeded email
+    include_role:
+      name: send-email
+    vars:
+      subject_email: "Sucesso ao gerar o certificado {{ common_name }}"
+      body_email: "Sucesso ao gerar o certificado {{ common_name }}"
+    loop:
+      - "{{ to_email }}"
+    when: cert_retrieval.changed == true
+      
+  - name: send failed email
+    include_role:
+      name: send-email
+    vars:
+      subject_email: "Falha ao gerar o certificado {{ common_name }}"
+      body_email: "Falha ao gerar o certificado {{ common_name }}"
+    loop:
+      - "{{ to_email }}"
+    when: cert_retrieval.changed == false

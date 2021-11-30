@@ -1,0 +1,53 @@
+---
+- name: Folder stat
+  stat:
+    path: "{{ ssl_file_nginx }}"
+  register: folder_exists
+
+- name: Creating a backup {{ ssl_file_nginx }}
+  copy:
+    src: "{{ ssl_file_nginx }}/"
+    dest: "{{ ssl_file_nginx }}.bkp"
+    backup: yes
+    remote_src: yes
+    owner: "{{ ssl_file_owner }}"
+    group: "{{ ssl_file_group }}"
+  when: folder_exists.stat.exists
+
+- name: removing {{ ssl_file_nginx }}
+  file:
+    state: absent
+    path: "{{ ssl_file_nginx }}"
+  when: folder_exists.stat.exists
+
+- name: updating SSL
+  copy:
+    src: "{{ tmpdir }}/"
+    dest: "{{ ssl_file_nginx }}"
+    owner: "{{ ssl_file_owner }}"
+    group: "{{ ssl_file_group }}"
+  register: copy_succeeded
+  notify:
+    - Reload nginx
+    - Reload php-fpm
+
+- name: send succeeded email
+  include_role:
+    name: send-email
+  vars:
+    subject_email: "Sucesso ao copiar e ativar o certificado {{ cloudflare_zone }}"
+    body_email: "Sucesso ao copiar e ativar o certificado {{ cloudflare_zone }} para os servidores de destino"
+  loop:
+    - "{{ to_email }}"
+  run_once: true
+  when: copy_succeeded.changed == true
+  
+- name: send failed email
+  include_role:
+    name: send-email
+  vars:
+    subject_email: "Falha ao copiar o certificado"
+    body_email: "Falha ao copiar o certificado {{ cloudflare_zone }} ao host {{ inventory_hostname }} em {{ ssl_file_nginx }}"
+  loop:
+    - "{{ to_email }}"
+  when: copy_succeeded.changed == false
